@@ -72,11 +72,17 @@ for index in train_data_scaled.index:
     question_quality.loc[index] = \
         (1 - train_data_scaled.at[index, 'CorrectRate']) \
         * train_data_scaled.at[index, 'AnswerVariance'] \
-        `- train_data_scaled.at[index, 'MeanConfidence']
+        - train_data_scaled.at[index, 'MeanConfidence']
 
 question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)
 question_quality = question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
 question_quality.describe()
+
+# Write rank in csv file
+template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/template.csv', na_values='?')
+for question_id in template['QuestionId']:
+    template.at[question_id, 'ranking'] = question_quality.at[question_id, 'Rank']
+template.to_csv('C:/Users/INHA/Documents/MLTermProject/submission/20182632.csv', index=False)
 
 # Validation
 validation_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_public.csv', na_values='?')
@@ -105,27 +111,27 @@ print(validation_scores)
 print("Max Validation Score: {0}".format(validation_scores.max()))
 
 # # Test
-# test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
-# question_quality_compare = []
-# for index in test_data.index:
-#     left_question = test_data.at[index, 'left']
-#     right_question = test_data.at[index, 'right']
-#     question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
+test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
+question_quality_compare = []
+for index in test_data.index:
+    left_question = test_data.at[index, 'left']
+    right_question = test_data.at[index, 'right']
+    question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
 
-# test_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
-# for index in test_data.index:
-#     if question_quality_compare[index] == test_data['T1_ALR'][index]:
-#         test_scores[0] += 1
-#     if question_quality_compare[index] == test_data['T2_CL'][index]:
-#         test_scores[1] += 1
-#     if question_quality_compare[index] == test_data['T3_GF'][index]:
-#         test_scores[2] += 1
-#     if question_quality_compare[index] == test_data['T4_MQ'][index]:
-#         test_scores[3] += 1
-#     if question_quality_compare[index] == test_data['T5_NS'][index]:
-#         test_scores[4] += 1
+test_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
+for index in test_data.index:
+    if question_quality_compare[index] == test_data['T1_ALR'][index]:
+        test_scores[0] += 1
+    if question_quality_compare[index] == test_data['T2_CL'][index]:
+        test_scores[1] += 1
+    if question_quality_compare[index] == test_data['T3_GF'][index]:
+        test_scores[2] += 1
+    if question_quality_compare[index] == test_data['T4_MQ'][index]:
+        test_scores[3] += 1
+    if question_quality_compare[index] == test_data['T5_NS'][index]:
+        test_scores[4] += 1
 
-# for expert in range(5):
-#     test_scores[expert] = test_scores[expert] / len(test_data)
-# print(test_scores)
-# print("Max Test Score: {0}".format(test_scores.max()))
+for expert in range(5):
+    test_scores[expert] = test_scores[expert] / len(test_data)
+print(test_scores)
+print("Max Test Score: {0}".format(test_scores.max()))
