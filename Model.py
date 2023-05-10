@@ -27,7 +27,7 @@ subject_metadata = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/metad
 # print(student_metadata)
 # print(subject_metadata)
 
-# Calculate features for measuring quality
+# [Calculate features for measuring quality]
 answer_integrated = pd.merge(answer_correct_data, answer_metadata, 'inner', 'AnswerId')
 answer_integrated_group = answer_integrated.groupby('QuestionId')
 train_data = pd.DataFrame(columns=['CorrectRate', 'MeanConfidence', 'AnswerVariance'])
@@ -46,33 +46,41 @@ print(answer_integrated[answer_integrated['QuestionId']==1].info())
 train_data['MeanConfidence'] = train_data['MeanConfidence'].fillna(train_data['MeanConfidence'].mean())
 train_data.isnull().sum()
 
-# Preprocessing
+# [Preprocessing]
 from sklearn.preprocessing import MinMaxScaler
 scaler = MinMaxScaler()
 train_data_scaled = scaler.fit(train_data).transform(train_data)
 train_data_scaled = pd.DataFrame(train_data_scaled, index=train_data.index, columns=train_data.columns)
 
 
-# # Use Clustering
-# from sklearn.cluster import KMeans
-# km = KMeans(n_clusters=2,
-#             init='random',
-#             n_init=10,
-#             max_iter=300,
-#             random_state=0)
-# km.fit()
-# student_metadata
-
 # [Validation]
 validation_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_public.csv', na_values='?')
 template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/template.csv', na_values='?')
+
+# For plotting
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+fig1 = plt.figure(1, figsize=(4,3), dpi = 200)
+plt.xlabel('Incorrect rate & answer variance coef')
+plt.ylabel('Mean expert score')
+
+fig2 = plt.figure(2, figsize=(4,3), dpi = 200)
+plt.xlabel('Confidence coef')
+plt.ylabel('Mean expert score')
+
+fig3 = plt.figure(3, figsize=(4,3), dpi = 200)
+ax = fig3.add_subplot(111, projection='3d')
+ax.set_xlabel('Incorrect rate & answer variance coef')
+ax.set_ylabel('Confidence coef')
+ax.set_zlabel('Mean expert score')
 
 # Grid Search for finding best coefficients
 best_score = 0.0
 best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
 
-for incorrect_rate_answer_var_interaction_coef in [0.01, 0.1, 0.5, 1, 5, 10, 50, 100]:
-    for confidence_coef in [-1, -0.7, -0.4, -0.1, 0.1, 0.4, 0.7, 1]:
+for incorrect_rate_answer_var_interaction_coef in [0.01, 0.1, 0.3, 0.5, 0.7, 1]:
+    for confidence_coef in [-1.5, -1, -0.85, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 1]:
 
         # Measure quality
         question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
@@ -110,12 +118,20 @@ for incorrect_rate_answer_var_interaction_coef in [0.01, 0.1, 0.5, 1, 5, 10, 50,
         
         for expert in range(5):
             validation_scores[expert] = validation_scores[expert] / len(validation_data)
-        
+                        
         mean_score = validation_scores.mean()
         if mean_score > best_score:
             best_score = mean_score
             best_question_quality = question_quality
             
+        #  Plot the mean score with current coefficient values
+        plt.figure(1)
+        plt.scatter(incorrect_rate_answer_var_interaction_coef, mean_score)
+        plt.figure(2)
+        plt.scatter(confidence_coef, mean_score)
+        plt.figure(3)
+        ax.scatter(incorrect_rate_answer_var_interaction_coef, confidence_coef, mean_score)
+        
 print("Max Validation Mean Score: {0}".format(best_score))
 
 # Write rank in csv file
@@ -124,7 +140,7 @@ for question_id in template['QuestionId']:
     template.at[question_id, 'ranking'] = best_question_quality.at[question_id, 'Rank']
 template.to_csv('C:/Users/INHA/Documents/MLTermProject/submission/20182632.csv', index=False)
 
-# # Test
+# [Test]
 test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
 question_quality_compare = []
 for index in test_data.index:
@@ -149,3 +165,5 @@ for expert in range(5):
     test_scores[expert] = test_scores[expert] / len(test_data)
 print(test_scores)
 print("Max Test Score: {0}".format(test_scores.max()))
+
+plt.show()
