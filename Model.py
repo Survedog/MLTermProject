@@ -52,63 +52,77 @@ scaler = MinMaxScaler()
 train_data_scaled = scaler.fit(train_data).transform(train_data)
 train_data_scaled = pd.DataFrame(train_data_scaled, index=train_data.index, columns=train_data.columns)
 
-# train_data_scaled.describe()
-# Which scaler would be proper for this data?
 
-# Use Clustering
-
+# # Use Clustering
 # from sklearn.cluster import KMeans
-# km = KMeans(n_clusters=3,
+# km = KMeans(n_clusters=2,
 #             init='random',
 #             n_init=10,
 #             max_iter=300,
 #             random_state=0)
+# km.fit()
+# student_metadata
 
-question_quality = pd.DataFrame(columns=['QualityMeasure'])
-question_quality.index.name = 'QuestionId'
+# [Validation]
+validation_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_public.csv', na_values='?')
+template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/template.csv', na_values='?')
 
-# Todo: Change quality measure method
-for index in train_data_scaled.index:
-    question_quality.loc[index] = \
-        (1 - train_data_scaled.at[index, 'CorrectRate']) \
-        * train_data_scaled.at[index, 'AnswerVariance'] \
-        - train_data_scaled.at[index, 'MeanConfidence']
+# Grid Search for finding best coefficients
+best_score = 0.0
+best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
 
-question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)
-question_quality = question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
-question_quality.describe()
+for incorrect_rate_answer_var_interaction_coef in [0.01, 0.1, 0.5, 1, 5, 10, 50, 100]:
+    for confidence_coef in [-1, -0.7, -0.4, -0.1, 0.1, 0.4, 0.7, 1]:
+
+        # Measure quality
+        question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
+        question_quality.index.name = 'QuestionId'
+        
+        for index in train_data_scaled.index:
+            question_quality.loc[index] = \
+                incorrect_rate_answer_var_interaction_coef \
+                * (1 - train_data_scaled.at[index, 'CorrectRate']) \
+                * train_data_scaled.at[index, 'AnswerVariance'] \
+                + confidence_coef * train_data_scaled.at[index, 'MeanConfidence']
+        
+        # Calculate quality rank
+        question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)        
+        question_quality.describe()
+        
+        question_quality_compare = []
+        for index in validation_data.index:
+            left_question = validation_data.at[index, 'left']
+            right_question = validation_data.at[index, 'right']
+            question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
+        
+        validation_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
+        for index in validation_data.index:
+            if question_quality_compare[index] == validation_data['T1_ALR'][index]:
+                validation_scores[0] += 1
+            if question_quality_compare[index] == validation_data['T2_CL'][index]:
+                validation_scores[1] += 1
+            if question_quality_compare[index] == validation_data['T3_GF'][index]:
+                validation_scores[2] += 1
+            if question_quality_compare[index] == validation_data['T4_MQ'][index]:
+                validation_scores[3] += 1
+            if question_quality_compare[index] == validation_data['T5_NS'][index]:
+                validation_scores[4] += 1
+        
+        for expert in range(5):
+            validation_scores[expert] = validation_scores[expert] / len(validation_data)
+        
+        mean_score = validation_scores.mean()
+        if mean_score > best_score:
+            best_score = mean_score
+            best_question_quality = question_quality
+            
+print("Max Validation Mean Score: {0}".format(best_score))
 
 # Write rank in csv file
-template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/template.csv', na_values='?')
+best_question_quality = best_question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
 for question_id in template['QuestionId']:
-    template.at[question_id, 'ranking'] = question_quality.at[question_id, 'Rank']
+    template.at[question_id, 'ranking'] = best_question_quality.at[question_id, 'Rank']
 template.to_csv('C:/Users/INHA/Documents/MLTermProject/submission/20182632.csv', index=False)
-
-# Validation
-validation_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_public.csv', na_values='?')
-question_quality_compare = []
-for index in validation_data.index:
-    left_question = validation_data.at[index, 'left']
-    right_question = validation_data.at[index, 'right']
-    question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
-
-validation_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
-for index in validation_data.index:
-    if question_quality_compare[index] == validation_data['T1_ALR'][index]:
-        validation_scores[0] += 1
-    if question_quality_compare[index] == validation_data['T2_CL'][index]:
-        validation_scores[1] += 1
-    if question_quality_compare[index] == validation_data['T3_GF'][index]:
-        validation_scores[2] += 1
-    if question_quality_compare[index] == validation_data['T4_MQ'][index]:
-        validation_scores[3] += 1
-    if question_quality_compare[index] == validation_data['T5_NS'][index]:
-        validation_scores[4] += 1
-
-for expert in range(5):
-    validation_scores[expert] = validation_scores[expert] / len(validation_data)
-print(validation_scores)
-print("Max Validation Score: {0}".format(validation_scores.max()))
 
 # # Test
 test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
@@ -116,7 +130,7 @@ question_quality_compare = []
 for index in test_data.index:
     left_question = test_data.at[index, 'left']
     right_question = test_data.at[index, 'right']
-    question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
+    question_quality_compare.append(1 if best_question_quality['Rank'][left_question] < best_question_quality['Rank'][right_question] else 2)
 
 test_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
 for index in test_data.index:
