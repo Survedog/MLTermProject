@@ -84,7 +84,6 @@ train_data = pd.DataFrame(columns=['IncorrectRate', 'AnswerVariance', 'UpperGrou
 train_data.index.name = 'QuestionId'
 train_data['AnswerVariance'] = answer_integrated_question_group.var()['AnswerValue']
 train_data['IncorrectRate'] = 1 - answer_integrated_question_group.mean()['IsCorrect']
-# train_data['IncorRateAnsVarInteract'] = train_data['AnswerVariance'] * train_data['IncorrectRate'] # delete later
 train_data[['UpperGroupConfidence', 'LowerGroupConfidence']] = \
     answer_integrated_question_group.mean()[['UpperGroupConfidence', 'LowerGroupConfidence']]
 
@@ -108,7 +107,8 @@ train_data_scaled.describe()
 
 # [PCA] TODO *
 from sklearn.decomposition import PCA
-train_data_PCA = PCA(n_components=3).fit_transform(train_data_scaled)
+pca = PCA(n_components=3)
+train_data_PCA = pca.fit_transform(train_data_scaled)
 train_data_PCA = pd.DataFrame(data=train_data_PCA, columns=['PC1', 'PC2', 'PC3'])
 
 # [Validation] *
@@ -142,9 +142,9 @@ best_score = 0.0
 best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
 best_coef_map = {"pc1" : 0.0, "pc2" : 0.0, "pc3" : 0.0}
 
-for pc1_coef in [-0.30, -0.20, -0.1, 0.0, 0.1, 0.20, 0.30]:
-    for pc2_coef in [-0.30, -0.20, -0.1, 0.0, 0.1, 0.20, 0.30]:
-        for pc3_coef in [-0.30, -0.20, -0.1, 0.0, 0.1, 0.20, 0.30]:
+for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
+    for pc2_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
+        for pc3_coef in [ 0.0, 0.1, 0.20, 0.30]:
     
             # Measure quality
             question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
@@ -234,3 +234,8 @@ print(test_scores)
 print("Max Test Score: {0}".format(test_scores.max()))
 
 plt.show()
+
+# [Divide question group by clustering]
+train_data_scaled.describe()
+kmeans = KMeans(n_clusters=4, random_state=1)
+train_data_scaled['Group'] = kmeans.fit_predict(train_data_scaled);
