@@ -63,6 +63,7 @@ kmeans = KMeans(n_clusters=2, random_state=1)
 student_solve_info_scaled['AchievementGroup'] = kmeans.fit_predict(student_solve_info_scaled.drop(columns=['UserId', 'SolvedCount'], inplace=False))
 
 # Check which acheivement group has better academic achievement.
+print(kmeans.cluster_centers_)
 print('[Group 0]\n', student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 0][['CorrectRate', 'MeanConfidence']].mean(), '\n')
 print('[Group 1]\n', student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 1][['CorrectRate', 'MeanConfidence']].mean(), '\n')
 # Achievement group 0 has higher value in both CorrectRate and MeanConfidence.
@@ -222,3 +223,7 @@ print("Max Test Score: {0}".format(test_scores.max()))
 # train_data_scaled['Group'] = kmeans.fit_predict(train_data_scaled);
 # for group in range(0, 2):
 #     print("[group{0}]\n{1}\n".format(group, train_data_scaled[train_data_scaled['Group'] == group].mean()))
+
+print(pca.explained_variance_ratio_)
+components_dataframe = pd.DataFrame(pca.components_, columns=train_data_scaled.columns, index = ['PC1', 'PC2', 'PC3'])
+print(components_dataframe)
