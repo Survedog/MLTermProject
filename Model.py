@@ -130,112 +130,98 @@ fig2 = plt.figure(3, figsize=(4,3), dpi = 200)
 plt.xlabel('PC3')
 plt.ylabel('Mean expert score')
 
-# fig3 = plt.figure(3, figsize=(4,3), dpi = 200)
-# ax = fig3.add_subplot(111, projection='3d')
-# ax.set_xlabel('Incorrect rate & answer variance coef')
-# ax.set_ylabel('Confidence coef')
-# ax.set_zlabel('Mean expert score')
+# Function for calculating prediction score for each expert's decision
+def calcPredictionScore(question_compare_data, question_quality_rank):
+    question_quality_compare = []
+    for index in question_compare_data.index:
+        left_question = question_compare_data.at[index, 'left']
+        right_question = question_compare_data.at[index, 'right']
+        question_quality_compare.append(1 if question_quality_rank[left_question] < question_quality_rank[right_question] else 2)
 
-# Grid Search for finding best coefficients
-best_score = 0.0
-best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
-best_coef_map = {"pc1" : 0.0, "pc2" : 0.0, "pc3" : 0.0}
-            
-for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
-    for pc2_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
-        for pc3_coef in [ 0.0, 0.1, 0.20, 0.30]:
-    
-            # Measure quality
-            question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
-            question_quality.index.name = 'QuestionId'
-            
-            train_data_PCA['PC1_weighted'] = train_data_PCA['PC1'].apply(lambda value: pc1_coef*value)
-            train_data_PCA['PC2_weighted'] = train_data_PCA['PC2'].apply(lambda value: pc2_coef*value)
-            train_data_PCA['PC3_weighted'] = train_data_PCA['PC3'].apply(lambda value: pc3_coef*value)
-            question_quality['QualityMeasure'] = train_data_PCA[['PC1_weighted', 'PC2_weighted', 'PC3_weighted']].apply(np.sum, axis='columns')
-            
-            # Calculate quality rank
-            question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)        
-            question_quality.describe()
-            
-            question_quality_compare = []
-            for index in validation_data.index:
-                left_question = validation_data.at[index, 'left']
-                right_question = validation_data.at[index, 'right']
-                question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
-
-            validation_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
-            for index in validation_data.index:
-                if question_quality_compare[index] == validation_data['T1_ALR'][index]:
-                    validation_scores[0] += 1
-                if question_quality_compare[index] == validation_data['T2_CL'][index]:
-                    validation_scores[1] += 1
-                if question_quality_compare[index] == validation_data['T3_GF'][index]:
-                    validation_scores[2] += 1
-                if question_quality_compare[index] == validation_data['T4_MQ'][index]:
-                    validation_scores[3] += 1
-                if question_quality_compare[index] == validation_data['T5_NS'][index]:
-                    validation_scores[4] += 1
-            
-            for expert in range(5):
-                validation_scores[expert] = validation_scores[expert] / len(validation_data)
-                         
-            mean_score = validation_scores.mean()
-            if mean_score > best_score:
-                best_score = mean_score
-                best_question_quality = question_quality
-                best_coef_map['pc1'] = pc1_coef
-                best_coef_map['pc2'] = pc2_coef                
-                best_coef_map['pc3'] = pc3_coef
+    prediction_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
+    for index in question_compare_data.index:
+        if question_quality_compare[index] == question_compare_data['T1_ALR'][index]:
+            prediction_scores[0] += 1
+        if question_quality_compare[index] == question_compare_data['T2_CL'][index]:
+            prediction_scores[1] += 1
+        if question_quality_compare[index] == question_compare_data['T3_GF'][index]:
+            prediction_scores[2] += 1
+        if question_quality_compare[index] == question_compare_data['T4_MQ'][index]:
+            prediction_scores[3] += 1
+        if question_quality_compare[index] == question_compare_data['T5_NS'][index]:
+            prediction_scores[4] += 1
                 
-            #  Plot the mean score with current coefficient values
-            plt.figure(1)
-            plt.scatter(pc1_coef, mean_score)
-            plt.figure(2)
-            plt.scatter(pc2_coef, mean_score)
-            plt.figure(3)
-            plt.scatter(pc3_coef, mean_score)
-            
-print("Max Validation Mean Score: {0}".format(best_score))
-print("Best Coefficient: {0}".format(best_coef_map))
+    for expert in range(5):
+        prediction_scores[expert] = prediction_scores[expert] / len(question_compare_data)
+    return prediction_scores
+
+# Function for finding quality measure predcition that results in the best validation score
+def calcBestQuestionQualityPrediction(feature_data, question_compare_data, pc1_coef_list, pc2_coef_list, pc3_coef_list):
+    best_score = 0.0
+    best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
+    best_coef_map = {"pc1" : 0.0, "pc2" : 0.0, "pc3" : 0.0}
+                
+    for pc1_coef in pc1_coef_list:
+        for pc2_coef in pc2_coef_list:
+            for pc3_coef in pc3_coef_list:
+        
+                # Measure quality
+                question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
+                question_quality.index.name = 'QuestionId'
+                
+                feature_data['PC1_weighted'] = feature_data['PC1'].apply(lambda value: pc1_coef*value)
+                feature_data['PC2_weighted'] = feature_data['PC2'].apply(lambda value: pc2_coef*value)
+                feature_data['PC3_weighted'] = feature_data['PC3'].apply(lambda value: pc3_coef*value)
+                question_quality['QualityMeasure'] = feature_data[['PC1_weighted', 'PC2_weighted', 'PC3_weighted']].apply(np.sum, axis='columns')
+                
+                # Calculate quality rank
+                question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)        
+                question_quality.describe()
+                
+                validation_scores = calcPredictionScore(question_compare_data, question_quality['Rank'])
+                mean_score = validation_scores.mean()
+                if mean_score > best_score:
+                    best_score = mean_score
+                    best_question_quality = question_quality
+                    best_coef_map['pc1'] = pc1_coef
+                    best_coef_map['pc2'] = pc2_coef                
+                    best_coef_map['pc3'] = pc3_coef
+                    
+                #  Plot the mean score with current coefficient values
+                plt.figure(1)
+                plt.scatter(pc1_coef, mean_score)
+                plt.figure(2)
+                plt.scatter(pc2_coef, mean_score)
+                plt.figure(3)
+                plt.scatter(pc3_coef, mean_score)
+                
+    print("Max Validation Mean Score: {0}".format(best_score))
+    print("Best Coefficient: {0}".format(best_coef_map))
+    return best_question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
+
+# Predict best question quality by validation with gridsearch
+question_quality_list = calcBestQuestionQualityPrediction(train_data_PCA, validation_data,
+                                                          [-0.20, -0.1, 0.0, 0.1, 0.20],
+                                                          [-0.20, -0.1, 0.0, 0.1, 0.20],
+                                                          [0.0, 0.1, 0.20, 0.30])
 
 # Write rank in csv file
-best_question_quality = best_question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
 for question_id in template['QuestionId']:
-    template.at[question_id, 'ranking'] = best_question_quality.at[question_id, 'Rank']
+    template.at[question_id, 'ranking'] = question_quality_list.at[question_id, 'Rank']
 template.to_csv('C:/Users/INHA/Documents/MLTermProject/submission/20182632.csv', index=False)
 
 # [Test]
 test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
-question_quality_compare = []
-for index in test_data.index:
-    left_question = test_data.at[index, 'left']
-    right_question = test_data.at[index, 'right']
-    question_quality_compare.append(1 if best_question_quality['Rank'][left_question] < best_question_quality['Rank'][right_question] else 2)
 
-test_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
-for index in test_data.index:
-    if question_quality_compare[index] == test_data['T1_ALR'][index]:
-        test_scores[0] += 1
-    if question_quality_compare[index] == test_data['T2_CL'][index]:
-        test_scores[1] += 1
-    if question_quality_compare[index] == test_data['T3_GF'][index]:
-        test_scores[2] += 1
-    if question_quality_compare[index] == test_data['T4_MQ'][index]:
-        test_scores[3] += 1
-    if question_quality_compare[index] == test_data['T5_NS'][index]:
-        test_scores[4] += 1
-
-for expert in range(5):
-    test_scores[expert] = test_scores[expert] / len(test_data)
+test_scores = calcPredictionScore(test_data, question_quality_list['Rank'])
 print(test_scores)
 print("Max Test Score: {0}".format(test_scores.max()))
 
 plt.show()
 
-# [Divide question group by clustering]
-train_data_scaled.describe()
-kmeans = KMeans(n_clusters=2, random_state=1)
-train_data_scaled['Group'] = kmeans.fit_predict(train_data_scaled);
-for group in range(0, 2):
-    print("[group{0}]\n{1}\n".format(group, train_data_scaled[train_data_scaled['Group'] == group].mean()))
+# # [Divide question group by clustering]
+# train_data_scaled.describe()
+# kmeans = KMeans(n_clusters=2, random_state=1)
+# train_data_scaled['Group'] = kmeans.fit_predict(train_data_scaled);
+# for group in range(0, 2):
+#     print("[group{0}]\n{1}\n".format(group, train_data_scaled[train_data_scaled['Group'] == group].mean()))
