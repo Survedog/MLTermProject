@@ -27,7 +27,7 @@ subject_metadata = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/metad
 # print(student_metadata)
 # print(subject_metadata)
 
-# [Using Clustering, Divide students by their academic achievement] *
+# [Using Clustering, Divide students by their academic achievement]
 answer_integrated = pd.merge(answer_correct_data, answer_metadata, 'inner', 'AnswerId')
 answer_integrated_user_group = answer_integrated.groupby('UserId')
 student_solve_info = pd.DataFrame(columns=['SolvedCount', 'CorrectRate', 'MeanConfidence'])
@@ -63,19 +63,19 @@ kmeans = KMeans(n_clusters=2, random_state=1)
 student_solve_info_scaled['AchievementGroup'] = kmeans.fit_predict(student_solve_info_scaled.drop(columns=['UserId', 'SolvedCount'], inplace=False))
 
 # Check which acheivement group has better academic achievement.
-print(student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 0][['CorrectRate', 'MeanConfidence']].mean())
-print(student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 1][['CorrectRate', 'MeanConfidence']].mean())
+print('[Group 0]\n', student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 0][['CorrectRate', 'MeanConfidence']].mean(), '\n')
+print('[Group 1]\n', student_solve_info_scaled[student_solve_info_scaled['AchievementGroup'] == 1][['CorrectRate', 'MeanConfidence']].mean(), '\n')
 # Achievement group 0 has higher value in both CorrectRate and MeanConfidence.
 # Thus, We can say that achievement group 0 is the upper academic achievement group, and group 1 is the lower academic achievement group.
 
-# [Compute mean confidence of each question seperately for two achievement groups] *
+# [Compute mean confidence of each question seperately for two achievement groups]
 answer_integrated = pd.merge(answer_integrated, student_solve_info_scaled[['UserId', 'AchievementGroup']], 'left', 'UserId')
 answer_integrated['AchievementGroup'].value_counts()
 
-answer_integrated['UpperGroupConfidence'] = answer_integrated.apply(lambda row: row['Confidence'] if row['AchievementGroup'] == 0 else np.NaN, axis='columns')
-answer_integrated['LowerGroupConfidence'] = answer_integrated.apply(lambda row: row['Confidence'] if row['AchievementGroup'] == 1 else np.NaN, axis='columns')
+answer_integrated[['UpperGroupConfidence', 'LowerGroupConfidence']] = np.NaN
+answer_integrated['UpperGroupConfidence'] = answer_integrated[answer_integrated['AchievementGroup'] == 0]['Confidence']
+answer_integrated['LowerGroupConfidence'] = answer_integrated[answer_integrated['AchievementGroup'] == 1]['Confidence']
 answer_integrated.describe()
-print(answer_integrated['AchievementGroup'].isnull().sum())
 
 # [Calculate other features for measuring quality, and make up train data] *
 answer_integrated_question_group = answer_integrated.groupby('QuestionId')
@@ -99,19 +99,19 @@ train_data['LowerGroupConfidence'] = train_data['LowerGroupConfidence'].fillna(t
 train_data['UpperGroupConfidence'] = train_data['UpperGroupConfidence'].fillna(train_data['UpperGroupConfidence'].mean())
 train_data.isnull().sum()
 
-# [Preprocessing before PCA] *
+# [Preprocessing before PCA]
 scaler = MinMaxScaler()
 train_data_scaled = scaler.fit_transform(train_data)
 train_data_scaled = pd.DataFrame(train_data_scaled, index=train_data.index, columns=train_data.columns)
 train_data_scaled.describe()
 
-# [PCA] *
+# [PCA]
 from sklearn.decomposition import PCA
 pca = PCA(n_components=3)
 train_data_PCA = pca.fit_transform(train_data_scaled)
 train_data_PCA = pd.DataFrame(data=train_data_PCA, columns=['PC1', 'PC2', 'PC3'])
 
-# [Validation] *
+# [Validation]
 validation_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_public.csv', na_values='?')
 template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/template.csv', na_values='?')
 
@@ -140,7 +140,7 @@ plt.ylabel('Mean expert score')
 best_score = 0.0
 best_question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
 best_coef_map = {"pc1" : 0.0, "pc2" : 0.0, "pc3" : 0.0}
-
+            
 for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
     for pc2_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
         for pc3_coef in [ 0.0, 0.1, 0.20, 0.30]:
@@ -149,11 +149,10 @@ for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
             question_quality = pd.DataFrame(columns=['QualityMeasure', 'Rank'])
             question_quality.index.name = 'QuestionId'
             
-            for index in train_data_PCA.index:
-                question_quality.loc[index] = \
-                    pc1_coef * train_data_PCA.at[index, 'PC1'] \
-                  + pc2_coef * train_data_PCA.at[index, 'PC2'] \
-                  + pc3_coef * train_data_PCA.at[index, 'PC3']
+            train_data_PCA['PC1_weighted'] = train_data_PCA['PC1'].apply(lambda value: pc1_coef*value)
+            train_data_PCA['PC2_weighted'] = train_data_PCA['PC2'].apply(lambda value: pc2_coef*value)
+            train_data_PCA['PC3_weighted'] = train_data_PCA['PC3'].apply(lambda value: pc3_coef*value)
+            question_quality['QualityMeasure'] = train_data_PCA[['PC1_weighted', 'PC2_weighted', 'PC3_weighted']].apply(np.sum, axis='columns')
             
             # Calculate quality rank
             question_quality['Rank'] = question_quality['QualityMeasure'].rank(method='first', ascending=False)        
@@ -164,7 +163,7 @@ for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
                 left_question = validation_data.at[index, 'left']
                 right_question = validation_data.at[index, 'right']
                 question_quality_compare.append(1 if question_quality['Rank'][left_question] < question_quality['Rank'][right_question] else 2)
-            
+
             validation_scores = pd.Series([0.0, 0.0, 0.0, 0.0, 0.0])
             for index in validation_data.index:
                 if question_quality_compare[index] == validation_data['T1_ALR'][index]:
@@ -180,7 +179,7 @@ for pc1_coef in [-0.20, -0.1, 0.0, 0.1, 0.20]:
             
             for expert in range(5):
                 validation_scores[expert] = validation_scores[expert] / len(validation_data)
-                            
+                         
             mean_score = validation_scores.mean()
             if mean_score > best_score:
                 best_score = mean_score
