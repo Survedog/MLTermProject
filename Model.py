@@ -105,7 +105,7 @@ train_data_scaled = scaler.fit_transform(train_data)
 train_data_scaled = pd.DataFrame(train_data_scaled, index=train_data.index, columns=train_data.columns)
 train_data_scaled.describe()
 
-# [PCA] TODO *
+# [PCA] *
 from sklearn.decomposition import PCA
 pca = PCA(n_components=3)
 train_data_PCA = pca.fit_transform(train_data_scaled)
@@ -117,7 +117,6 @@ template = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/submission/templat
 
 # For plotting
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 fig1 = plt.figure(1, figsize=(4,3), dpi = 200)
 plt.xlabel('PC1')
@@ -237,5 +236,7 @@ plt.show()
 
 # [Divide question group by clustering]
 train_data_scaled.describe()
-kmeans = KMeans(n_clusters=4, random_state=1)
+kmeans = KMeans(n_clusters=2, random_state=1)
 train_data_scaled['Group'] = kmeans.fit_predict(train_data_scaled);
+for group in range(0, 2):
+    print("[group{0}]\n{1}\n".format(group, train_data_scaled[train_data_scaled['Group'] == group].mean()))
