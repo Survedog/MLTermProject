@@ -79,7 +79,6 @@ answer_integrated.describe()
 
 # [Calculate other features for measuring quality, and make up train data] *
 answer_integrated_question_group = answer_integrated.groupby('QuestionId')
-answer_integrated_question_group
 train_data = pd.DataFrame(columns=['IncorrectRate', 'AnswerVariance', 'UpperGroupConfidence', 'LowerGroupConfidence'])
 train_data.index.name = 'QuestionId'
 train_data['AnswerVariance'] = answer_integrated_question_group.var()['AnswerValue']
@@ -87,8 +86,8 @@ train_data['IncorrectRate'] = 1 - answer_integrated_question_group.mean()['IsCor
 train_data[['UpperGroupConfidence', 'LowerGroupConfidence']] = \
     answer_integrated_question_group.mean()[['UpperGroupConfidence', 'LowerGroupConfidence']]
 
-train_data.isnull().sum()
-print(answer_integrated[answer_integrated['QuestionId']==1])
+print(train_data.isnull().sum())
+print(answer_integrated[answer_integrated['QuestionId']==1].info())
 # There is some questions that none of its answers have confidence info.
 # -> Set mean confidence as their confidence. (for both upper and lower group confidence)
 
@@ -195,16 +194,17 @@ def calcBestQuestionQualityPrediction(feature_data, question_compare_data, pc1_c
                 plt.figure(3)
                 plt.scatter(pc3_coef, mean_score)
                 
-    print("Max Validation Mean Score: {0}".format(best_score))
-    print("Best Coefficient: {0}".format(best_coef_map))
+    plt.show()
+    print("Max Validation Mean Score: ", best_score)
+    print("Best Coefficient: ", best_coef_map)
     return best_question_quality.astype(dtype={'QualityMeasure':'float64', 'Rank':'int64'})
 
 # Predict best question quality by validation with gridsearch
 question_quality_list = calcBestQuestionQualityPrediction(train_data_PCA, validation_data,
-                                                          [-0.20, -0.1, 0.0, 0.1, 0.20],
-                                                          [-0.20, -0.1, 0.0, 0.1, 0.20],
-                                                          [0.0, 0.1, 0.20, 0.30])
-
+                                                          [-0.30, -0.20, -0.10, 0.0, 0.10, 0.20, 0.30],
+                                                          [-0.30, -0.20, -0.10, 0.0, 0.10, 0.20, 0.30],
+                                                          [-0.30, -0.20, -0.10, 0.0, 0.10, 0.20, 0.30])
+ 
 # Write rank in csv file
 for question_id in template['QuestionId']:
     template.at[question_id, 'ranking'] = question_quality_list.at[question_id, 'Rank']
@@ -212,12 +212,9 @@ template.to_csv('C:/Users/INHA/Documents/MLTermProject/submission/20182632.csv',
 
 # [Test]
 test_data = pd.read_csv('C:/Users/INHA/Documents/MLTermProject/data/test_data/quality_response_remapped_private.csv', na_values='?')
-
 test_scores = calcPredictionScore(test_data, question_quality_list['Rank'])
 print(test_scores)
 print("Max Test Score: {0}".format(test_scores.max()))
-
-plt.show()
 
 # # [Divide question group by clustering]
 # train_data_scaled.describe()
